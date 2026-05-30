@@ -1,0 +1,20 @@
+# Node / Worker
+worker/node_modules/
+worker/.wrangler/
+worker/dist/
+node_modules/
+
+# Dependency lockfile for the Worker is kept; ignore npm debug logs
+npm-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Build artifacts
+*.zip
+*.log
