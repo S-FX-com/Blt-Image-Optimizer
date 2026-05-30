@@ -26,3 +26,35 @@ WebP supports animation, but CF's `cf.image` transform of complex animated GIFs 
 
 **Workers.dev limitation on cf.image (critical)**
 See above. This is the #1 setup mistake. Add a validation check in the Settings UI that pings the Worker and returns an error if `cf.image` appears unsupported (Worker can return a diagnostic header indicating zone vs. workers.dev context).
+
+---
+
+## 2026.05.30 — Initial Build
+
+**Parallel webp size-map instead of mutating core metadata**
+Rather than rewriting `_wp_attachment_metadata`'s `file` fields to point at `.webp`
+(which can break other plugins that read canonical metadata, and complicates revert),
+the plugin stores a parallel `_blt_webp_sizes` postmeta map and lets the front-end
+rewrite filters swap extensions only when a `.webp` exists on disk. The `_blt_optimized`
+flag marks completion and drives the bulk scanner's "not yet optimized" query.
+
+**Auto-optimize is async**
+`wp_generate_attachment_metadata` enqueues an Action Scheduler async action
+(`blt_optimizer_process_single`) instead of doing the Worker round-trip inline — uploads
+stay fast and a slow/unreachable Worker never blocks the editor. Falls back to inline
+optimization only when Action Scheduler is absent.
+
+**Secret encrypted at rest with AES-256-GCM**
+`worker_secret` is encrypted using a key derived from WP auth salts (sha256), with an
+openssl GCM path and a clearly-tagged base64 fallback. Empty secret field on save
+preserves the existing value so the field can render masked.
+
+**Worker /health reports cf.image context**
+The Worker exposes `GET /health` returning `cf_image: <bool>` based on the presence of
+`request.cf` (populated on zone routes, absent on workers.dev). Settings → Test Connection
+surfaces this so the #1 setup mistake is caught before any bulk run.
+
+**Plugin Update Checker bundled, not Composer**
+PUC v5.7 is vendored under `vendor/plugin-update-checker/` and loaded directly (no Composer
+autoload on client installs). Pointed at `s-fx-com/blt-image-optimizer` with release assets
+enabled — tag a release matching the `YYYY.MM.DD.HHMM` header to ship an update.
