@@ -1,0 +1,93 @@
+name: Release
+
+# Cut a new timestamped release on every push to the default branch.
+# The Plugin Update Checker bundled in the plugin reads the latest GitHub
+# Release and offers the attached .zip to client sites, so a release here
+# becomes an available update everywhere the plugin is installed.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  # Serialize releases so two pushes can't race for the same tag.
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute version (YYYY.MM.DD.HHMM, UTC)
+        id: version
+        run: |
+          set -euo pipefail
+          VERSION="$(date -u +'%Y.%m.%d.%H%M')"
+
+          # Avoid collisions if two pushes land in the same minute.
+          if git rev-parse "refs/tags/${VERSION}" >/dev/null 2>&1; then
+            VERSION="${VERSION}.${GITHUB_RUN_NUMBER}"
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Release version: ${VERSION}"
+
+      - name: Stage plugin and inject version
+        id: stage
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          SLUG="blt-image-optimizer"
+          STAGE="build/${SLUG}"
+          rm -rf build
+          mkdir -p "${STAGE}"
+
+          # Copy only the runtime plugin files (the Worker and dev docs are
+          # not part of the distributed WordPress plugin). vendor/ holds the
+          # update checker and MUST be included.
+          rsync -a \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'build' \
+            --exclude 'worker' \
+            --exclude 'node_modules' \
+            --exclude '.gitignore' \
+            --exclude 'CLAUDE.md' \
+            --exclude 'AGENTS.md' \
+            --exclude 'todo.md' \
+            --exclude 'lessons.md' \
+            blt-image-optimizer.php uninstall.php includes admin vendor README.md \
+            "${STAGE}/"
+
+          # Inject the release version into the plugin header and constant so
+          # the installed plugin reports the same version as the release tag.
+          MAIN="${STAGE}/blt-image-optimizer.php"
+          sed -i -E "s/^( \* Version:[[:space:]]*).*/\1${VERSION}/" "${MAIN}"
+          sed -i -E "s/(define\( 'BLT_OPTIMIZER_VERSION', ')[^']*(' \);)/\1${VERSION}\2/" "${MAIN}"
+
+          echo "Header after injection:"
+          grep -E "Version:|BLT_OPTIMIZER_VERSION" "${MAIN}"
+
+          ( cd build && zip -rq "${SLUG}.zip" "${SLUG}" )
+          echo "zip=build/${SLUG}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          ZIP: ${{ steps.stage.outputs.zip }}
+        run: |
+          set -euo pipefail
+          gh release create "${VERSION}" "${ZIP}" \
+            --title "${VERSION}" \
+            --target "${GITHUB_SHA}" \
+            --generate-notes
