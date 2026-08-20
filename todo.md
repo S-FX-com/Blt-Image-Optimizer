@@ -1,4 +1,4 @@
-# tasks/todo.md — Blt Image Optimizer
+# tasks/todo.md — BLT Image Optimizer
 
 _Last updated: 2026.05.30 — initial build complete_
 

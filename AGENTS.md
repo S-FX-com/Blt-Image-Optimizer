@@ -1,4 +1,4 @@
-# AGENTS.md — Blt Image Optimizer
+# AGENTS.md — BLT Image Optimizer
 
 ## Agent Roles
 

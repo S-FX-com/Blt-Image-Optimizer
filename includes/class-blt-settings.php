@@ -12,6 +12,10 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Manages the blt_optimizer_settings option, including at-rest encryption
  * of the Worker shared secret.
+ *
+ * The Worker URL and secret resolve through this plugin's own option first;
+ * only when that comes back empty is the shared BLT family store consulted
+ * (see BLT_Family::get(), which is gated on an opt-in that defaults off).
  */
 class Settings {
 
@@ -82,7 +86,26 @@ class Settings {
 		$all = self::all();
 
 		if ( 'worker_secret' === $key ) {
-			return self::decrypt( $all['worker_secret'] );
+			$secret = self::decrypt( $all['worker_secret'] );
+
+			// Shared BLT family store, consulted only once this plugin's own
+			// value has come back empty. Gated on a per-plugin opt-in that
+			// defaults off, and never written back into this plugin's option.
+			if ( '' === $secret && class_exists( 'BLT_Family' ) ) {
+				$secret = (string) \BLT_Family::get( 'blt-image-optimizer', 'image_worker', 'worker_secret' );
+			}
+
+			return $secret;
+		}
+
+		if ( 'worker_url' === $key ) {
+			$url = (string) $all['worker_url'];
+
+			if ( '' === $url && class_exists( 'BLT_Family' ) ) {
+				$url = (string) \BLT_Family::get( 'blt-image-optimizer', 'image_worker', 'worker_url' );
+			}
+
+			return $url;
 		}
 
 		if ( array_key_exists( $key, $all ) ) {

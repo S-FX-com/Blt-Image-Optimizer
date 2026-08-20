@@ -1,6 +1,6 @@
 <?php
 /**
- * Uninstall cleanup for Blt Image Optimizer.
+ * Uninstall cleanup for BLT Image Optimizer.
  *
  * Removes the plugin's options and custom log table. Optimized .webp files
  * and attachment postmeta are intentionally LEFT INTACT — the hand-off model

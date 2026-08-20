@@ -52,8 +52,15 @@ jobs:
           mkdir -p "${STAGE}"
 
           # Copy only the runtime plugin files (the Worker and dev docs are
-          # not part of the distributed WordPress plugin). vendor/ holds the
-          # update checker and MUST be included.
+          # not part of the distributed WordPress plugin). This is an explicit
+          # allowlist, so anything the plugin needs at runtime has to be named:
+          #   vendor/          the bundled update checker
+          #   includes/        includes/blt-family/ (the shared BLT family layer)
+          #   assets/          the shared design system CSS and the BLT mark
+          #                    (assets/img/blt-mark*.svg feed the admin menu
+          #                    icon and the plugin-card icons)
+          # DESIGN.md and blt-family-smoke.php are dev-only and stay out simply
+          # by not being listed.
           rsync -a \
             --exclude '.git' \
             --exclude '.github' \
@@ -65,7 +72,7 @@ jobs:
             --exclude 'AGENTS.md' \
             --exclude 'todo.md' \
             --exclude 'lessons.md' \
-            blt-image-optimizer.php uninstall.php includes admin vendor README.md \
+            blt-image-optimizer.php uninstall.php includes admin assets vendor README.md \
             "${STAGE}/"
 
           # Inject the release version into the plugin header and constant so
