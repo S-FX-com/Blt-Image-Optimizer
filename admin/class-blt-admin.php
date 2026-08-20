@@ -50,6 +50,7 @@ class Admin {
 	 */
 	public function init() {
 		add_action( 'admin_menu', array( $this, 'register_menu' ) );
+		add_action( 'admin_head', array( $this, 'print_menu_icon_style' ) );
 		add_action( 'admin_init', array( $this, 'handle_settings_post' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'wp_dashboard_setup', array( $this, 'register_dashboard_widget' ) );
@@ -71,12 +72,12 @@ class Admin {
 	 */
 	public function register_menu() {
 		add_menu_page(
-			__( 'Blt Image Optimizer', 'blt-image-optimizer' ),
-			__( 'Image Optimizer', 'blt-image-optimizer' ),
+			__( 'BLT Image Optimizer', 'blt-image-optimizer' ),
+			__( 'BLT Image Optimizer', 'blt-image-optimizer' ),
 			self::CAP,
 			self::MENU_SLUG,
 			array( $this, 'render_bulk_page' ),
-			'dashicons-images-alt2',
+			\BLT_Family_Brand::menu_icon( BLT_OPTIMIZER_DIR ),
 			81
 		);
 
@@ -109,6 +110,18 @@ class Admin {
 	}
 
 	/**
+	 * Light the BLT menu mark up on hover and while the section is open.
+	 *
+	 * WordPress paints an SVG icon_url as a CSS background image and never
+	 * recolours it, so a dashicon's hover behaviour has to be restored here.
+	 *
+	 * @return void
+	 */
+	public function print_menu_icon_style() {
+		\BLT_Family_Brand::print_menu_icon_style( self::MENU_SLUG );
+	}
+
+	/**
 	 * Add a Settings link on the Plugins screen.
 	 *
 	 * @param array $links Existing action links.
@@ -128,14 +141,31 @@ class Admin {
 	 * @return void
 	 */
 	public function enqueue_assets( $hook ) {
-		if ( false === strpos( $hook, self::MENU_SLUG ) && 'index.php' !== $hook ) {
+		$is_plugin_page = false !== strpos( $hook, self::MENU_SLUG );
+
+		if ( ! $is_plugin_page && 'index.php' !== $hook ) {
 			return;
+		}
+
+		$deps = array();
+
+		// Shared BLT design system: this plugin's own screens only, never the
+		// dashboard and never the front end.
+		if ( $is_plugin_page ) {
+			wp_enqueue_style(
+				'blt-image-optimizer-design-system',
+				BLT_OPTIMIZER_URL . 'assets/css/blt-design-system.css',
+				array(),
+				BLT_OPTIMIZER_VERSION
+			);
+
+			$deps[] = 'blt-image-optimizer-design-system';
 		}
 
 		wp_enqueue_style(
 			'blt-optimizer-admin',
 			BLT_OPTIMIZER_URL . 'admin/assets/blt-admin.css',
-			array(),
+			$deps,
 			BLT_OPTIMIZER_VERSION
 		);
 
@@ -188,6 +218,12 @@ class Admin {
 		$this->guard();
 		$settings = Settings::all();
 		$saved    = isset( $_GET['blt_saved'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		// Manual update check. The automatic check runs once a day at midnight
+		// site time (BLT_Family_Updates); this link bypasses that floor.
+		$update_url  = \BLT_Family_Updates::check_now_url( BLT_OPTIMIZER_UPDATE_SLUG );
+		$last_check  = \BLT_Family_Updates::last_check_time( update_checker() );
+
 		require BLT_OPTIMIZER_DIR . 'admin/views/settings.php';
 	}
 
@@ -364,7 +400,7 @@ class Admin {
 
 		wp_add_dashboard_widget(
 			'blt_optimizer_widget',
-			__( 'Blt Image Optimizer', 'blt-image-optimizer' ),
+			__( 'BLT Image Optimizer', 'blt-image-optimizer' ),
 			array( $this, 'render_dashboard_widget' )
 		);
 	}

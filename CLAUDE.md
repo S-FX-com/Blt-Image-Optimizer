@@ -1,11 +1,11 @@
-# Blt Image Optimizer — CLAUDE.md
+# BLT Image Optimizer — CLAUDE.md
 
 ## Project Overview
 
-**Plugin Name:** Blt Image Optimizer  
+**Plugin Name:** BLT Image Optimizer  
 **Slug:** `blt-image-optimizer`  
 **Version Scheme:** Timestamp-based — `YYYY.MM.DD.HHMM`  
-**Author:** Shane Skwarek / S-FX.com  
+**Author:** S-FX.com  
 **Stack:** WordPress plugin (PHP) + Cloudflare Worker (TypeScript)
 
 A WordPress plugin that permanently optimizes images on-disk (compress + WebP conversion) by routing them through a self-hosted Cloudflare Worker. Optimizations are destructive-in-the-good-sense — results live on the server so the plugin can be disabled or handed off with zero runtime dependencies.
@@ -52,6 +52,7 @@ Once an image is optimized, it's just a file on disk. The plugin can be deactiva
 ```
 blt-image-optimizer/
 ├── CLAUDE.md                        ← this file
+├── DESIGN.md                        ← BLT family design & convention standard (shared, do not fork)
 ├── AGENTS.md                        ← agent role definitions
 ├── tasks/
 │   ├── todo.md                      ← active task list
@@ -64,7 +65,11 @@ blt-image-optimizer/
 │   ├── class-blt-attachment-meta.php    ← updates WP attachment metadata
 │   ├── class-blt-queue.php              ← Action Scheduler bulk queue manager
 │   ├── class-blt-settings.php           ← settings storage & retrieval
-│   └── class-blt-logger.php             ← per-image status log (custom DB table)
+│   ├── class-blt-logger.php             ← per-image status log (custom DB table)
+│   └── blt-family/                      ← shared BLT family layer (vendored, do not fork)
+├── assets/
+│   ├── css/blt-design-system.css        ← shared admin design system (vendored)
+│   └── img/                             ← BLT mark + plugin-card icons (vendored)
 ├── admin/
 │   ├── class-blt-admin.php              ← admin menu, page routing
 │   ├── views/
@@ -202,6 +207,49 @@ const response = await fetch(image_url, {
 
 ---
 
+## BLT Family Layer (shared, vendored — do not fork)
+
+`includes/blt-family/`, `assets/css/blt-design-system.css`, `assets/img/` and
+`DESIGN.md` are maintained as one canonical copy across every BLT plugin and
+vendored byte-identical into each repo. Read them; never edit them here. Read
+`DESIGN.md` before touching any admin screen.
+
+What this plugin wires into it:
+
+- **Registration** — `blt_family_register()` in `blt-image-optimizer.php`, at
+  load time (not in a hook), declaring the `image_worker` group.
+- **Credential fallback** — `Settings::get()` consults
+  `BLT_Family::get( 'blt-image-optimizer', 'image_worker', … )` for
+  `worker_url` / `worker_secret`, and only after this plugin's own option has
+  come back empty. Precedence is always the plugin's own option → shared store;
+  nothing ever writes a shared value back into `blt_optimizer_settings`. The
+  shared read is gated on a per-plugin opt-in that defaults **off**.
+- **Update policy** — the checker is built with `24` as `$checkPeriod` (a
+  checker built with `0` registers no scheduler hooks at all and cannot be
+  revived), then `BLT_Family_Updates::apply()` holds automatic checks to one a
+  day anchored to 00:00 site time. Manual checks stay immediate, including the
+  **Check for Updates** link on the Settings screen.
+- **Brand** — `BLT_Family_Brand::menu_icon()` supplies the top-level menu icon
+  and `BLT_Family_Brand::print_menu_icon_style()` restores dashicon-style hover
+  brightening; `BLT_Family_Brand::inline_mark()` is the mark in page headers.
+- **Admin UI** — every custom screen is `<div class="wrap blt-ui …">` and is
+  composed from the design-system components (`.blt-card`, `.blt-field`,
+  `.blt-toggle`, `.blt-badge`, `.blt-stats`, `.blt-progress`, `.blt-empty`).
+  `admin/assets/blt-admin.css` carries page-specific layout only.
+
+### "BLT" is all caps
+
+Everywhere a human reads it: the plugin name, admin labels, page titles,
+notices, docs. **Never** in machine identifiers — the text domain
+`blt-image-optimizer`, the option key `blt_optimizer_settings`, the menu slug
+`blt-optimizer`, the `{prefix}blt_optimizer_log` table, the
+`BltImageOptimizer` namespace, `BLT_OPTIMIZER_*` constants, hook and AJAX
+action names, CSS classes, and the Worker's `X-Blt-Optimizer` response header
+all stay exactly as they are. Renaming any of them breaks live sites or
+orphans saved data.
+
+---
+
 ## Coding Standards
 
 - PHP 8.0+ minimum
@@ -229,7 +277,7 @@ const response = await fetch(image_url, {
 
 ## Related Plugins (S-FX Ecosystem)
 
-- **Blt Gallery** — sibling plugin, R2-backed photo galleries. Separate plugin, separate purpose. Potential future shared settings layer via `Blt Core`.
+- **BLT Gallery** — sibling plugin, R2-backed photo galleries. Separate plugin, separate purpose. Potential future shared settings layer via `BLT Core`.
 
 ---
 
@@ -238,3 +286,4 @@ const response = await fetch(image_url, {
 | Version | Date | Notes |
 |---|---|---|
 | 0.1.0 | TBD | Initial scaffold |
+| 2026.08.20.0757 | 2026-08-20 | BLT family layer wired in (registration, `image_worker` credential fallback, daily update policy, shared design system, BLT mark); plugin renamed to **BLT Image Optimizer** in all user-facing copy |

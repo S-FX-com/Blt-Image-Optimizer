@@ -1,4 +1,4 @@
-# tasks/lessons.md — Blt Image Optimizer
+# tasks/lessons.md — BLT Image Optimizer
 
 Decisions made, gotchas hit, patterns established. Update this as the build progresses.
 
